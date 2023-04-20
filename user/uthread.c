@@ -67,7 +67,7 @@ void uthread_yield() {
     }
     // If there is a next thread, switch to it
     if (next_thread != -1) {
-        // Save the current context
+        // Save the current context, use uswtch to switch to the next thread
         uswtch(&current_thread_ptr->context, &uthreads_table[next_thread].context);
         // Update the current thread pointer
         current_thread_ptr = &uthreads_table[next_thread];

@@ -1,109 +1,119 @@
 // #include "uthread.h"
-// #include "uthread.c"
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <assert.h>
+// #include "user.h"
 
-// #define NUM_THREADS 2
-
-// void start_func_1();
-// void start_func_2();
-
-// struct uthread threads[NUM_THREADS];
-// int thread_count = 0;
+// // Simple function to be used as start function for user threads
+// void test_func() {
+//     printf(1, "Thread %d running\n", uthread_self()->index);
+//     uthread_yield();
+//     printf(1, "Thread %d running again\n", uthread_self()->index);
+//     uthread_exit();
+// }
 
 // void test_uthread_create() {
-//   // Create a new thread with priority HIGH
-//   int result = uthread_create(start_func_1, HIGH);
-//   assert(result == 0);
-  
-//   // Create a new thread with priority LOW
-//   result = uthread_create(start_func_2, LOW);
-//   assert(result == 0);
-// }
-
-// void test_uthread_set_priority() {
-//   // Set the priority of the first thread to LOW
-//   enum sched_priority prev_priority = uthread_set_priority(LOW);
-//   assert(prev_priority == HIGH);
-  
-//   // Set the priority of the second thread to HIGH
-//   prev_priority = uthread_set_priority(HIGH);
-//   assert(prev_priority == LOW);
-// }
-
-// void test_uthread_get_priority() {
-//   // Get the priority of the first thread
-//   enum sched_priority priority = uthread_get_priority();
-//   assert(priority == LOW);
-  
-//   // Get the priority of the second thread
-//   priority = uthread_get_priority();
-//   assert(priority == HIGH);
+//     // Test creating a thread with valid priority
+//     int ret = uthread_create(test_func, LOW);
+//     if (ret != 0) {
+//         printf(1, "Test failed: could not create thread with valid priority\n");
+//         exit(1);
+//     }
+//     // Test creating a thread with invalid priority
+//     ret = uthread_create(test_func, NUM_PRIORITIES+1);
+//     if (ret == 0) {
+//         printf(1, "Test failed: created thread with invalid priority\n");
+//         exit(1);
+//     }
+//     // Test creating too many threads
+//     for (int i = 0; i < MAX_UTHREADS; i++) {
+//         ret = uthread_create(test_func, LOW);
+//         if (ret != 0) {
+//             printf(1, "Test failed: could not create thread %d\n", i);
+//             exit(1);
+//         }
+//     }
+//     ret = uthread_create(test_func, LOW);
+//     if (ret == 0) {
+//         printf(1, "Test failed: created more than MAX_UTHREADS threads\n");
+//         exit(1);
+//     }
+//     printf(1, "Test uthread_create passed\n");
 // }
 
 // void test_uthread_yield() {
-//   // Switch to the second thread
-//   uthread_yield();
-  
-//   // Switch back to the first thread
-//   uthread_yield();
+//     // Create three threads with different priorities
+//     uthread_create(test_func, LOW);
+//     uthread_create(test_func, MEDIUM);
+//     uthread_create(test_func, HIGH);
+//     // Yield twice to make sure the highest priority thread runs first
+//     uthread_yield();
+//     uthread_yield();
+//     // Check that the highest priority thread has run first
+//     if (uthread_self()->priority != HIGH) {
+//         printf(1, "Test failed: did not run highest priority thread first\n");
+//         exit(1);
+//     }
+//     printf(1, "Test uthread_yield passed\n");
 // }
 
 // void test_uthread_exit() {
-//   // Exit the first thread
-//   uthread_exit();
-  
-//   // The second thread should now be running
-//   // Exit the second thread
-//   uthread_exit();
-  
-//   // There should be no more running threads
+//     // Create two threads and exit the first one
+//     uthread_create(test_func, LOW);
+//     uthread_create(test_func, LOW);
+//     uthread_exit();
+//     // Check that the first thread has been terminated and the second one is running
+//     if (uthread_self()->index != 1) {
+//         printf(1, "Test failed: did not exit first thread correctly\n");
+//         exit(1);
+//     }
+//     // Exit the second thread
+//     uthread_exit();
+//     // Check that the process has terminated
+//     if (1) {
+//         printf(1, "Test failed: did not terminate process correctly\n");
+//         exit(1);
+//     }
+//     printf(1, "Test uthread_exit passed\n");
 // }
 
-// void test_uthread_start_all() {
-//   // Try to start all threads from the main thread
-//   int result = uthread_start_all();
-//   assert(result == -1);
+// void test_uthread_set_priority() {
+//     // Create a thread and set its priority to high
+//     uthread_create(test_func, LOW);
+//     uthread_set_priority(HIGH);
+//     // Check that the priority has been updated
+//     if (uthread_get_priority() != HIGH) {
+//         printf(2, "Test failed: could not set thread priority correctly\n");
+//         exit(1);
+//     }
+//     // Try to set an invalid priority
+//     uthread_set_priority(NUM_PRIORITIES+1);
+//     // Check that the priority has not been updated
+//     if (uthread_get_priority() != HIGH) {
+//         printf(2, "Test failed: set invalid priority\n");
+//         exit(1);
+//     }
+//     printf(1, "Test uthread_set_priority passed\n");
 // }
 
-// void test_uthread_self() {
-//   // Get the UTCB of the first thread
-//   struct uthread* thread = uthread_self();
-//   assert(thread == &threads[0]);
-  
-//   // Get the UTCB of the second thread
-//   thread = uthread_self();
-//   assert(thread == &threads[1]);
+// void test_uthread_get_priority() {
+//     // Create a thread with priority MEDIUM
+//     uthread_create(test_func, MEDIUM);
+//     // Check that the priority is MEDIUM
+//     if (uthread_get_priority() != MEDIUM) {
+//         printf(2, "Test failed: could not get thread priority correctly\n");
+//         exit(1);
+//     }
+//     printf(1, "Test uthread_get_priority passed\n");
 // }
 
-// int main() {
-//   // Initialize the uthread library
-//   uthread_init();
-
-//   // Run all tests
-//   test_uthread_create();
-//   test_uthread_set_priority();
-//   test_uthread_get_priority();
-//   test_uthread_yield();
-//   test_uthread_exit();
-//   test_uthread_start_all();
-//   test_uthread_self();
-  
-//   printf("All tests passed!\n");
-
-//   // Clean up the uthread library
-//   uthread_cleanup();
-
-//   return 0;
+// int main(int argc, char *argv[]) {
+//     // Run all tests
+//     test_uthread_create();
+//     test_uthread_yield();
+//     test_uthread_exit();
+//     test_uthread_set_priority();
+//     test_uthread_get_priority();
+//     printf(1, "All tests passed!\n");
+//     exit(0);
 // }
 
-// void start_func_1() {
-//   printf("Thread 1 running...\n");
-//   uthread_exit();
-// }
 
-// void start_func_2() {
-//   printf("Thread 2 running...\n");
-//   uthread_exit();
-// }
+

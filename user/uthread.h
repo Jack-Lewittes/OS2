@@ -2,6 +2,8 @@
 
 #define STACK_SIZE  4000
 #define MAX_UTHREADS  4
+//def for test_uthread
+#define NUM_PRIORITIES 3
 
 enum sched_priority { LOW, MEDIUM, HIGH };
 
@@ -30,10 +32,10 @@ struct context {
 
 struct uthread {
     char                ustack[STACK_SIZE];  // the thread's stack
-    enum tstate         state;          // FREE, RUNNING, RUNNABLE
-    struct context      context;        // uswtch() here to run process
-    enum sched_priority priority;       // scheduling priority
-    int                 index;            // thread index in the table    
+    enum tstate         state;               // FREE, RUNNING, RUNNABLE
+    struct context      context;             // uswtch() here to run process
+    enum sched_priority priority;            // scheduling priority
+    int                 index;               // thread index in the table (TASK1)    
 };
 
 extern void uswtch(struct context*, struct context*);
