@@ -50,10 +50,49 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
-struct kthread
-{
+//Task 2.1
 
-  uint64 kstack;                // Virtual address of kernel stack
+// Saved registers for kernel context switches.
+struct context {
+  uint64 ra;
+  uint64 sp;
 
-  struct trapframe *trapframe;  // data page for trampoline.S
+  // callee-saved
+  uint64 s0;
+  uint64 s1;
+  uint64 s2;
+  uint64 s3;
+  uint64 s4;
+  uint64 s5;
+  uint64 s6;
+  uint64 s7;
+  uint64 s8;
+  uint64 s9;
+  uint64 s10;
+  uint64 s11;
+};
+
+// Per-CPU state.
+struct cpu {
+  struct kthread *thread;     // The thread running on this cpu, or null.
+  struct context context;     // swtch() here to enter scheduler().
+  int noff;                   // Depth of push_off() nesting.
+  int intena;                 // Were interrupts enabled before push_off()?
+};
+
+extern struct cpu cpus[NCPU];
+
+
+//KTCB
+struct kthread {
+  struct spinlock lock;         // lock for this thread
+  enum procstate state;         // thread state (e.g. RUNNING, BLOCKED, etc.)
+  void *chan;                   // channel for sleeping threads
+  int killed;                   // set to non-zero if thread has been killed
+  int exit_status;              // thread's exit status
+  int tid;                      // thread ID (unique per process)
+  struct proc *proc;            // pointer to parent process
+  uint64 kstack;                // virtual address of kernel stack
+  struct trapframe *trapframe;  // pointer to thread's trapframe
+  struct context context;       // context needed for context switch
 };

@@ -8,6 +8,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct kthread;
 
 // bio.c
 void            binit(void);
@@ -110,6 +111,13 @@ void            procdump(void);
 // kthread.c
 void                kthreadinit(struct proc *);
 struct kthread*     mykthread();
+void                forkret(void);
+void                kthreadinit(struct proc *p);
+int                 alloctid(struct proc *p);
+static struct kthread* allockthread(struct proc *p);
+static void         freekthread(struct kthread *kt);
+struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt);
+
 
 // TODO: delte this after you are done with task 2.2
 void allocproc_help_function(struct proc *p);

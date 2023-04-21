@@ -86,7 +86,8 @@ myproc(void)
 {
   push_off();
   struct cpu *c = mycpu();
-  struct proc *p = c->proc;
+  //TASK 2.2 (change access to proc thru cpu)
+  struct proc *p = c->thread->proc;
   pop_off();
   return p;
 }
@@ -127,6 +128,10 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
+  // Task 2.2
+  p->next_tid = 1;
+
+
   // Allocate a trapframe page.
   if((p->base_trapframes = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -142,13 +147,15 @@ found:
     return 0;
   }
 
-
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  //Task 2.2
+  allockthread(p);
+  // here, we have acquired p->lock and p->kthread[0]->lock (read alloc kthread func)
 
   // TODO: delte this after you are done with task 2.2
   allocproc_help_function(p);
@@ -161,6 +168,14 @@ found:
 static void
 freeproc(struct proc *p)
 {
+  //task 2.2
+  for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
+    if(kt->state == UNUSED)
+      continue;
+    
+    freekthread(kt);
+  }
+
   if(p->base_trapframes)
     kfree((void*)p->base_trapframes);
   p->base_trapframes = 0;
@@ -175,6 +190,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -239,8 +255,8 @@ void
 userinit(void)
 {
   struct proc *p;
-
-  p = allocproc();
+  // acquire p->lock and then p->kthread[0]->lock (== kt->lock)
+  p = allocproc(); 
   initproc = p;
   
   // allocate one user page and copy initcode's instructions
@@ -256,6 +272,10 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+  // Task 2.2: release before p->lock becuase allocproc already acquired it by calling 
+  // allockthread (which acquires kt->lock)
+  p->kthread[0].state = RUNNABLE;
+  release(&p->kthread[0].lock);
 
   release(&p->lock);
 }
@@ -381,9 +401,13 @@ exit(int status)
   wakeup(p->parent);
   
   acquire(&p->lock);
-
+  //saves the exit status in the proc
   p->xstate = status;
   p->state = ZOMBIE;
+  //Task 2.2 TODO: check with aner if this is enough? 
+  for(int i = 0; i < NKT; i++){
+    p->kthread[i].state = ZOMBIE;
+  }
 
   release(&wait_lock);
 
@@ -454,7 +478,10 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   
-  c->proc = 0;
+  //TASK 2.2
+  //c->proc = 0;
+  c->thread->proc = 0;
+
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
@@ -466,12 +493,16 @@ scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
-        c->proc = p;
+        //c->proc = p;
+        c->thread->proc = p;
+
         swtch(&c->context, &p->context);
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
-        c->proc = 0;
+        
+        //c->proc = 0;
+        c->thread->proc = 0;
       }
       release(&p->lock);
     }
@@ -601,6 +632,16 @@ kill(int pid)
       if(p->state == SLEEPING){
         // Wake process from sleep().
         p->state = RUNNABLE;
+        // TASK 2.2
+        struct kthread *kt;
+        for (kt = p->kthread; kt < &p->kthread[NKT]; kt++){
+          acquire(&kt->lock);
+          kt->killed = 1;
+          if(kt->state == SLEEPING){
+            kt->state = RUNNABLE;
+          }
+          release(&kt->lock);
+        }
       }
       release(&p->lock);
       return 0;
@@ -665,6 +706,7 @@ either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 void
 procdump(void)
 {
+  //task 2.2 TODO : WTF 
   static char *states[] = {
   [UNUSED]    "unused",
   [USED]      "used",

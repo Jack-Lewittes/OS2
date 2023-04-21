@@ -1,40 +1,10 @@
 #include "kthread.h"
 
-// Saved registers for kernel context switches.
-struct context {
-  uint64 ra;
-  uint64 sp;
-
-  // callee-saved
-  uint64 s0;
-  uint64 s1;
-  uint64 s2;
-  uint64 s3;
-  uint64 s4;
-  uint64 s5;
-  uint64 s6;
-  uint64 s7;
-  uint64 s8;
-  uint64 s9;
-  uint64 s10;
-  uint64 s11;
-};
-
-// Per-CPU state.
-struct cpu {
-  struct proc *proc;          // The process running on this cpu, or null.
-  struct context context;     // swtch() here to enter scheduler().
-  int noff;                   // Depth of push_off() nesting.
-  int intena;                 // Were interrupts enabled before push_off()?
-};
-
-extern struct cpu cpus[NCPU];
-
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
-// Per-process state
+// Per-process state (PCB)
 struct proc {
-  struct spinlock lock;
+  struct spinlock lock;        // lock for public properties
 
   // p->lock must be held when using these:
   enum procstate state;        // Process state
@@ -57,4 +27,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  
+  //TASK 2.1
+  struct spinlock tid_lock;    // Lock for thread ID allocation
+  int isThread;                // If non-zero, process is a thread
+  int next_tid;                // Next available thread ID
+
 };
