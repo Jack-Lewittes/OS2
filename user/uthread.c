@@ -13,16 +13,20 @@ void uthread_init() {
     num_threads = 0;
 }
 
+
 int uthread_create(void (*start_func)(), enum sched_priority priority) {
     int i;
+    if(priority < LOW || priority > HIGH) {
+        return -1;
+    }
 
     // Find a free entry in the table
     for (i = 0; i < MAX_UTHREADS; i++) {
-        if (uthreads_table[i].state == FREE) {
+        if (uthreads_table[i].state == FREE) { // FREE == empty slot or thread that has exited
             break;
         }
     }
-    // Check if there is a free entry
+    // no free entry found
     if (i == MAX_UTHREADS) {
         return -1;
     }
@@ -43,22 +47,18 @@ int uthread_create(void (*start_func)(), enum sched_priority priority) {
     // Update the number of threads
     num_threads++;
 
-    // Set the current thread pointer to the first created thread
-    if (num_threads == 1) {
-        current_thread_ptr = &uthreads_table[i];
-    }
 
     return 0;
 }
 
-
+// Function called to pick next thread based on priority
 void uthread_yield() {
     int i, next_thread = -1;
     enum sched_priority highest_priority = LOW;
 
     // Find the next runnable thread with highest priority
     for (i = 0; i < MAX_UTHREADS; i++) {
-        // Check if the thread is runnable and has higher priority than the current highest priority
+        // Check if the thread is runnable and has higher priority than the current highest priority (from available threads)
         if (uthreads_table[i].state == RUNNABLE && uthreads_table[i].priority > highest_priority) {
             // Update the highest priority and the next thread
             highest_priority = uthreads_table[i].priority;
@@ -67,6 +67,10 @@ void uthread_yield() {
     }
     // If there is a next thread, switch to it
     if (next_thread != -1) {
+        // Case: first call from main 
+        if(current_thread_ptr == 0) {
+            current_thread_ptr = &uthreads_table[next_thread];
+        }
         // Save the current context, use uswtch to switch to the next thread
         uswtch(&current_thread_ptr->context, &uthreads_table[next_thread].context);
         // Update the current thread pointer
@@ -77,7 +81,7 @@ void uthread_yield() {
 void uthread_exit() {
     // Free the stack of the terminated thread
     free(current_thread_ptr->ustack);
-    // Mark the thread as free
+    // Mark the thread as free, (fulfilling Round Robin requirement)
     current_thread_ptr->state = FREE;
     num_threads--;
 
@@ -110,21 +114,31 @@ enum sched_priority uthread_get_priority() {
 }
 
 /*
-Pick the first user thread to run according to the scheduling policy and start it. If successful, this function 
-never returns.
-If subsequent calls (after the user threads were already started) to uthread_start_all are made, return -1 to 
-indicate error.
+    Edge Case: Calling uthread_start_all() when no threads have been created
+
 */
 int uthread_start_all() {
-    static int started = 0;
-    if (started) {
-        return -1;
+    //static int started = 0;
+    if(num_threads == 0) {
+        exit(0);
     }
-    started = 1;
-    while (num_threads > 0) {
-        uthread_yield();
-    }
-    // No more threads to run, terminate the process
+
+    // if (started) {
+    //     return -1;
+    // }
+    // started = 1;
+    
+    // Set the current thread pointer to 0 as since no thread has been started yet
+    current_thread_ptr = 0;
+    uthread_yield();
+    
+
+    // Set the current thread pointer to the first created thread
+    // if (num_threads == 1) {
+    //     current_thread_ptr = &uthreads_table[current_thread_ptr->index];
+    // }
+
+
     exit(0);
 }
 
