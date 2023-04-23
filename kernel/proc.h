@@ -1,6 +1,19 @@
-#include "kthread.h"
 
-enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+
+
+//TASK 2.2 
+/*
+cpu's run threads -> only trap threads can be these states.  
+If a cpu runs process, its running a specific thread, so it can only be running or runnable (thread).
+
+Used == RUNNING or RUNNABLE  
+Running a process == running a thread within.  Therefore threadstate is expanded, and procstate only needs
+these three states.
+
+*/
+
+enum procstate {P_UNUSED, P_USED, P_ZOMBIE };
+
 
 // Per-process state (PCB)
 struct proc {

@@ -3,8 +3,10 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "kthread.h"
 #include "proc.h"
 #include "defs.h"
+
 
 struct cpu cpus[NCPU];
 
@@ -55,7 +57,7 @@ procinit(void)
   initlock(&wait_lock, "wait_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
-      p->state = UNUSED;
+      p->state = P_UNUSED;
       kthreadinit(p);
   }
 }
@@ -109,14 +111,13 @@ allocpid()
 // If found, initialize state required to run in the kernel,
 // and return with p->lock held.
 // If there are no free procs, or a memory allocation fails, return 0.
-static struct proc*
-allocproc(void)
+static struct proc* allocproc(void)
 {
   struct proc *p;
 
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
-    if(p->state == UNUSED) {
+    if(p->state == P_UNUSED) {
       goto found;
     } else {
       release(&p->lock);
@@ -126,11 +127,10 @@ allocproc(void)
 
 found:
   p->pid = allocpid();
-  p->state = USED;
+  p->state = P_USED;
 
   // Task 2.2
   p->next_tid = 1;
-
 
   // Allocate a trapframe page.
   if((p->base_trapframes = (struct trapframe *)kalloc()) == 0){
@@ -153,12 +153,12 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
-  //Task 2.2
+  //TASK 2.2
   allockthread(p);
-  // here, we have acquired p->lock and p->kthread[0]->lock (read alloc kthread func)
+  // here, we have acquired p->lock (above) and p->kthread[0]->lock (in alloc_kthread)
 
   // TODO: delte this after you are done with task 2.2
-  allocproc_help_function(p);
+  //allocproc_help_function(p);
   return p;
 }
 
@@ -189,7 +189,7 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
-  p->state = UNUSED;
+  p->state = P_UNUSED;
 
 }
 
@@ -264,6 +264,11 @@ userinit(void)
   uvmfirst(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
 
+// TASK 2.2 (post trapframe when running)
+  struct kthread *kt;
+  kt = allockthread(p);
+  p->kthread[0] = *kt;      
+
   // prepare for the very first "return" from kernel to user.
   p->kthread[0].trapframe->epc = 0;      // user program counter
   p->kthread[0].trapframe->sp = PGSIZE;  // user stack pointer
@@ -271,12 +276,12 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  p->state = RUNNABLE;
-  // Task 2.2: release before p->lock becuase allocproc already acquired it by calling 
+  p->state =P_USED;
+  // TASK 2.2: release before p->lock becuase allocproc already acquired it by calling 
   // allockthread (which acquires kt->lock)
   p->kthread[0].state = RUNNABLE;
   release(&p->kthread[0].lock);
-
+  //
   release(&p->lock);
 }
 
@@ -346,7 +351,7 @@ fork(void)
   release(&wait_lock);
 
   acquire(&np->lock);
-  np->state = RUNNABLE;
+  np->state = P_USED;
   release(&np->lock);
 
   return pid;
@@ -403,10 +408,13 @@ exit(int status)
   acquire(&p->lock);
   //saves the exit status in the proc
   p->xstate = status;
-  p->state = ZOMBIE;
-  //Task 2.2 TODO: check with aner if this is enough? 
+  p->state = P_ZOMBIE;
+  //TASK 2.2 TODO: missing release of p->lock? 
   for(int i = 0; i < NKT; i++){
-    p->kthread[i].state = ZOMBIE;
+    //if unused, then that thread was never initialized, so we don't need to change its state
+    if(p->kthread[i].state != UNUSED) {
+      p->kthread[i].state = ZOMBIE;
+    }
   }
 
   release(&wait_lock);
@@ -436,7 +444,7 @@ wait(uint64 addr)
         acquire(&pp->lock);
 
         havekids = 1;
-        if(pp->state == ZOMBIE){
+        if(pp->state == P_ZOMBIE){
           // Found one.
           pid = pp->pid;
           if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
@@ -488,11 +496,11 @@ scheduler(void)
 
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
+      if(p->state == P_USED) {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
-        p->state = RUNNING;
+        p->state = P_USED;
         //c->proc = p;
         c->thread->proc = p;
 
@@ -526,7 +534,7 @@ sched(void)
     panic("sched p->lock");
   if(mycpu()->noff != 1)
     panic("sched locks");
-  if(p->state == RUNNING)
+  if(p->state == P_USED)
     panic("sched running");
   if(intr_get())
     panic("sched interruptible");
@@ -542,7 +550,7 @@ yield(void)
 {
   struct proc *p = myproc();
   acquire(&p->lock);
-  p->state = RUNNABLE;
+  p->state = P_USED;
   sched();
   release(&p->lock);
 }
@@ -587,7 +595,7 @@ sleep(void *chan, struct spinlock *lk)
 
   // Go to sleep.
   p->chan = chan;
-  p->state = SLEEPING;
+  p->state = P_USED;  //was sleeping
 
   sched();
 
@@ -609,8 +617,9 @@ wakeup(void *chan)
   for(p = proc; p < &proc[NPROC]; p++) {
     if(p != myproc()){
       acquire(&p->lock);
-      if(p->state == SLEEPING && p->chan == chan) {
-        p->state = RUNNABLE;
+      //TODO: was sleeping in if
+      if(p->state == P_USED && p->chan == chan) {
+        p->state = P_USED;
       }
       release(&p->lock);
     }
@@ -629,14 +638,16 @@ kill(int pid)
     acquire(&p->lock);
     if(p->pid == pid){
       p->killed = 1;
-      if(p->state == SLEEPING){
-        // Wake process from sleep().
-        p->state = RUNNABLE;
+      if(p->state == P_USED){
+        // Wake process from sleep(). TASK2.2 (remove line as no such state)
+        //p->state = RUNNABLE;
+        
         // TASK 2.2
         struct kthread *kt;
         for (kt = p->kthread; kt < &p->kthread[NKT]; kt++){
           acquire(&kt->lock);
           kt->killed = 1;
+          // wake up all threads in sleep
           if(kt->state == SLEEPING){
             kt->state = RUNNABLE;
           }
@@ -708,19 +719,16 @@ procdump(void)
 {
   //task 2.2 TODO : WTF 
   static char *states[] = {
-  [UNUSED]    "unused",
-  [USED]      "used",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
+  [P_UNUSED]    "unused",
+  [P_USED]      "used",
+  [P_ZOMBIE]    "zombie"
   };
   struct proc *p;
   char *state;
 
   printf("\n");
   for(p = proc; p < &proc[NPROC]; p++){
-    if(p->state == UNUSED)
+    if(p->state == P_UNUSED)
       continue;
     if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
       state = states[p->state];

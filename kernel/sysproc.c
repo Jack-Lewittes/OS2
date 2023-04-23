@@ -4,6 +4,7 @@
 #include "param.h"
 #include "memlayout.h"
 #include "spinlock.h"
+#include "kthread.h"
 #include "proc.h"
 
 uint64

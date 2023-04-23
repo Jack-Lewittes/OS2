@@ -3,6 +3,7 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "kthread.h"
 #include "proc.h"
 #include "defs.h"
 
@@ -152,8 +153,13 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+  // if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
+  //   yield();
+
+  //TASK 2.2 - testing condition should reference the desired kthread and its state
+  if(which_dev == 2 && mykthread() != 0 && mykthread()->state == RUNNING)
     yield();
+
 
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.

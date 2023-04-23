@@ -82,11 +82,12 @@ struct cpu {
 
 extern struct cpu cpus[NCPU];
 
+enum threadstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 //KTCB
 struct kthread {
   struct spinlock lock;         // lock for this thread
-  enum procstate state;         // thread state (e.g. RUNNING, BLOCKED, etc.)
+  enum threadstate state;       // thread state (e.g. RUNNING, BLOCKED, etc.)
   void *chan;                   // channel for sleeping threads
   int killed;                   // set to non-zero if thread has been killed
   int exit_status;              // thread's exit status
@@ -96,3 +97,5 @@ struct kthread {
   struct trapframe *trapframe;  // pointer to thread's trapframe
   struct context context;       // context needed for context switch
 };
+
+

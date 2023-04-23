@@ -3,6 +3,7 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "kthread.h"
 #include "proc.h"
 #include "defs.h"
 
@@ -50,7 +51,7 @@ int alloctid(struct proc *p)
   return tid;
 }
 
-static struct kthread* allockthread(struct proc *p){
+struct kthread* allockthread(struct proc *p){
   struct kthread *kt;
   for (kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
@@ -77,8 +78,10 @@ static struct kthread* allockthread(struct proc *p){
 
 }
 
-static void freekthread(struct kthread *kt)
+void freekthread(struct kthread *kt)
 {
+  //TODO: nothing to change here after proc/thread state changes ?
+  
   if(kt->trapframe)
     kfree((void*)kt->trapframe);
   kt->trapframe = 0;
@@ -95,7 +98,6 @@ static void freekthread(struct kthread *kt)
 }
 
 
-
 //Given Functions below
 
 struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
@@ -105,9 +107,9 @@ struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 
 
 // TODO: delte this after you are done with task 2.2
-void allocproc_help_function(struct proc *p) {
-  p->kthread->trapframe = get_kthread_trapframe(p, p->kthread);
+// void allocproc_help_function(struct proc *p) {
+//   p->kthread->trapframe = get_kthread_trapframe(p, p->kthread);
 
-  p->context.sp = p->kthread->kstack + PGSIZE;
-}
+//   p->context.sp = p->kthread->kstack + PGSIZE;
+// }
 
