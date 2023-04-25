@@ -15,10 +15,10 @@ struct spinlock tid_lock;
 
 void kthreadinit(struct proc *p)
 {
+  // printf("kthreadinit\n");
 
   for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
-
     // WARNING: Don't change this line!
     // get the pointer to the kernel stack of the kthread
     kt->kstack = KSTACK((int)((p - proc) * NKT + (kt - p->kthread)));
@@ -26,12 +26,9 @@ void kthreadinit(struct proc *p)
     kt->proc = p;
     // for each thread, initialize the kt lock
     initlock(&kt->lock, "kthread_lock");
-
-
   }
     initlock(&p->tid_lock, "tid_lock");
     p->next_tid = 1;
-
 }
 
 struct kthread *mykthread()
@@ -44,6 +41,7 @@ struct kthread *mykthread()
 
 int alloctid(struct proc *p)
 {
+  // printf("alloctid\n");
   acquire(&p->tid_lock);
   int tid = p->next_tid++;
   release(&p->tid_lock);
@@ -52,6 +50,7 @@ int alloctid(struct proc *p)
 }
 
 struct kthread* allockthread(struct proc *p){
+  // printf("allockthread\n");
   struct kthread *kt;
   for (kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
@@ -81,7 +80,7 @@ struct kthread* allockthread(struct proc *p){
 void freekthread(struct kthread *kt)
 {
   //TODO: nothing to change here after proc/thread state changes ?
-  
+  // printf("freekthread\n");
   if(kt->trapframe)
     kfree((void*)kt->trapframe);
   kt->trapframe = 0;
@@ -102,6 +101,7 @@ void freekthread(struct kthread *kt)
 
 struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 {
+  // printf("get_kthread_trapframe\n");
   return p->base_trapframes + ((int)(kt - p->kthread));
 }
 
