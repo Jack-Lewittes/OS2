@@ -57,6 +57,15 @@ struct kthread* allockthread(struct proc *p){
     acquire(&kt->lock);
     if (kt->state == UNUSED)
     {
+      // 26.4 changes
+      kt->proc = p;
+      kt->killed = 0;
+      // check if the kthread has a stack, if not, allocate one
+      if( (kt->kstack = (uint64)kalloc()) == 0) {
+        release(&kt->lock);
+        return 0;
+      }
+      //
       kt->state = USED;
       kt->tid = alloctid(p);
       //assign trapframe to the kthread

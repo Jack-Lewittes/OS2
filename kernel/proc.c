@@ -334,12 +334,20 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+  // 26.4
+  np->kthread[0] = *kt;
+  np->parent = p;
+  //
 
   // copy saved user registers.
   *(np->kthread[0].trapframe) = *(kt->trapframe);
 
   // Cause fork to return 0 in the child.
   np->kthread[0].trapframe->a0 = 0;
+  // 26.4 added
+  np->kthread[0].proc = np;
+  np->kthread[0].state = RUNNABLE;
+  //
 
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
@@ -351,6 +359,9 @@ fork(void)
 
   pid = np->pid;
 
+  //26.4 : release lock from allocproc
+  release(&np->kthread[0].lock);
+  //
   release(&np->lock);
   printf("fork: after np->lock release\n");
   acquire(&wait_lock);
