@@ -330,13 +330,14 @@ fork(void)
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
+    release(&np->kthread[0].lock);
     release(&np->lock);
     return -1;
   }
   np->sz = p->sz;
   // 26.4
-  np->kthread[0] = *kt;
-  np->parent = p;
+  // np->kthread[0] = *kt;
+  // np->parent = p;
   //
 
   // copy saved user registers.
@@ -345,8 +346,8 @@ fork(void)
   // Cause fork to return 0 in the child.
   np->kthread[0].trapframe->a0 = 0;
   // 26.4 added
-  np->kthread[0].proc = np;
-  np->kthread[0].state = RUNNABLE;
+  // np->kthread[0].proc = np;
+  // np->kthread[0].state = RUNNABLE;
   //
 
   // increment reference counts on open file descriptors.
@@ -361,18 +362,20 @@ fork(void)
 
   //26.4 : release lock from allocproc
   release(&np->kthread[0].lock);
-  //
   release(&np->lock);
-  printf("fork: after np->lock release\n");
+
   acquire(&wait_lock);
   np->parent = p;
   release(&wait_lock);
-  printf("fork: after waitlock release\n");
 
-  acquire(&np->lock);
-  np->state = P_USED;
-  release(&np->lock);
-  printf("fork: end\n");
+  //acquire(&np->lock);
+  //np->state = P_USED;
+  //release(&np->lock);
+
+  acquire(&np->kthread[0].lock);
+  np->kthread[0].state = RUNNABLE;
+  release(&np->kthread[0].lock);
+  
   return pid;
 }
 
@@ -526,7 +529,8 @@ scheduler(void)
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
-        p->state = P_USED;
+       
+       // p->state = P_USED;
         //c->proc = p;
         
         //TASK 2.2
@@ -536,25 +540,22 @@ scheduler(void)
           if(p->kthread[i].state == RUNNABLE){
             p->kthread[i].state = RUNNING;
             c->thread = &p->kthread[i];
-            release(&p->kthread[i].lock);
-            break;
+            swtch(&c->context, &p->kthread[i].context);
+            c->thread = 0;
+
+
+            // release(&p->kthread[i].lock);
+            // break;
           }
           release(&p->kthread[i].lock);
         }
 
-        //c->thread = p->kthread;
-        printf("scheduler: before swtch\n");
-        if(c->thread !=0){
-          //swtch(&c->context, &p->context);
-          swtch(&c->context, &p->kthread[i].context);
-          printf("scheduler: after swtch\n");
-        }
-
+        
+        
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         
         //c->proc = 0;
-        c->thread = 0;
       }
       release(&p->lock);
     }

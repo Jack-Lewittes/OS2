@@ -24,19 +24,29 @@ void kthreadinit(struct proc *p)
     kt->kstack = KSTACK((int)((p - proc) * NKT + (kt - p->kthread)));
     kt->state = UNUSED;
     kt->proc = p;
+
+    kt->tid = -1;
     // for each thread, initialize the kt lock
     initlock(&kt->lock, "kthread_lock");
   }
     initlock(&p->tid_lock, "tid_lock");
     p->next_tid = 1;
+
+    
 }
 
 struct kthread *mykthread()
 {
   //return &myproc()->kthread[0];
 
-  struct cpu *c = &cpus[cpuid()];
-  return c->thread;
+  // struct cpu *c = &cpus[cpuid()];
+  // return c->thread;
+    push_off();
+    struct cpu *c = mycpu();
+    struct kthread *kt = c->thread;
+    pop_off();
+    return kt;
+
 }
 
 int alloctid(struct proc *p)
@@ -58,18 +68,27 @@ struct kthread* allockthread(struct proc *p){
     if (kt->state == UNUSED)
     {
       // 26.4 changes
-      kt->proc = p;
-      kt->killed = 0;
-      // check if the kthread has a stack, if not, allocate one
-      if( (kt->kstack = (uint64)kalloc()) == 0) {
-        release(&kt->lock);
-        return 0;
-      }
+      // kt->proc = p;
+      // kt->killed = 0;
+      // // check if the kthread has a stack, if not, allocate one
+      // if( (kt->kstack = (uint64)kalloc()) == 0) {
+      //   release(&kt->lock);
+      //   return 0;
+      // }
       //
       kt->state = USED;
       kt->tid = alloctid(p);
       //assign trapframe to the kthread
       kt->trapframe = get_kthread_trapframe(p, kt);
+
+      if(kt->trapframe == 0){
+        printf("entered trapframe == 0\n");
+        freekthread(kt); //must be called holding the KT-LOCK
+        release(&kt->lock);
+        return 0;
+      }
+
+
       //init context to zeros
       memset(&kt->context, 0, sizeof(kt->context));
       //change ra register in context to forkret address
@@ -88,21 +107,20 @@ struct kthread* allockthread(struct proc *p){
 
 void freekthread(struct kthread *kt)
 {
-  //TODO: nothing to change here after proc/thread state changes ?
-  // printf("freekthread\n");
-  if(kt->trapframe)
-    kfree((void*)kt->trapframe);
-  kt->trapframe = 0;
-  //set context to zeros
-  memset(&kt->context, 0, sizeof(kt->context));
-  kt->tid = 0;
+  
+  // if(kt->trapframe)
+  //   kfree((void*)kt->trapframe);
+  // kt->trapframe = 0;
+  // //set context to zeros
+  // memset(&kt->context, 0, sizeof(kt->context));
+
+  kt->tid = -1;
   kt->proc = 0;
   kt->kstack = 0;
   kt->chan = 0;
   kt->killed = 0;
   kt->exit_status = 0;
   kt->state = UNUSED;
-  //release(&kt->lock);
 }
 
 
