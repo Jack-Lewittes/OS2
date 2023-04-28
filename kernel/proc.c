@@ -173,13 +173,7 @@ static void
 freeproc(struct proc *p)
 {
   // printf("freeproc\n");
-  //TASK 2.2
-  for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
-    if(kt->state == UNUSED)
-      continue;
-    
-    freekthread(kt);
-  }
+  
 
   if(p->base_trapframes)
     kfree((void*)p->base_trapframes);
@@ -195,6 +189,10 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = P_UNUSED;
+  //TASK 2.2
+  for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
+    freekthread(kt);
+  }
 
 }
 
