@@ -125,6 +125,7 @@ static struct proc* allocproc(void)
 
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
+
     if(p->state == P_UNUSED) {
       goto found;
     } else {
@@ -140,6 +141,8 @@ found:
   acquire(&p->tid_lock);
   p->next_tid = 1;
   release(&p->tid_lock);
+  struct cpu *cc = mycpu();
+  printf("noff: %d\n",cc->noff);
   //
   
 
@@ -167,6 +170,7 @@ found:
 
   // TODO: delte this after you are done with task 2.2
   //allocproc_help_function(p);
+
   return p;
 }
 
@@ -425,8 +429,6 @@ exit(int status)
   //saves the exit status in the proc
   p->xstate = status;
   p->state = P_ZOMBIE;
-  
-
   release(&p->lock);
 
   //TASK 2.2 
@@ -559,6 +561,7 @@ sched(void)
   int intena;
   //TASK 2.2
   struct kthread *kt = mykthread();
+  printf("noff val : %d\n", mycpu()->noff);
 
   if(!holding(&kt->lock))
     panic("sched p->lock");

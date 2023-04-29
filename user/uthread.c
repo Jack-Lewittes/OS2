@@ -36,10 +36,9 @@ int uthread_create(void (*start_func)(), enum sched_priority priority) {
     uthreads_table[i].state = RUNNABLE;
 
     // Initialize the thread's context
-    memset(&uthreads_table[i].context, 0, sizeof(struct context));                  // Clear the context
+    memset(&uthreads_table[i].context, 0, sizeof(struct context));                    // Clear the context
     uthreads_table[i].context.sp = (uint64) &uthreads_table[i].ustack[STACK_SIZE-1];  // Set the stack pointer to the top of the stack
-    // uthreads_table[i].context.sp = (uint64) &uthreads_table[i].ustack + (STACK_SIZE-1);
-    uthreads_table[i].context.ra = (uint64) start_func;                             // Set the return address
+    uthreads_table[i].context.ra = (uint64) start_func;                               // Set the return address
 
     // Set the thread's priority
     uthreads_table[i].priority = priority;
@@ -156,14 +155,6 @@ int uthread_start_all() {
     // Switch to the thread with the highest priority
     uswtch(&t.context, &current_thread_ptr->context);
     return 0;
-
-
-
-
-
-
-
-
 }
 
 // Return a pointer to the UTCB associated with the calling thread.
