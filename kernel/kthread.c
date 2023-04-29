@@ -16,20 +16,19 @@ struct spinlock tid_lock;
 void kthreadinit(struct proc *p)
 {
   // printf("kthreadinit\n");
+  initlock(&p->tid_lock, "tid_lock");
 
   for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
+    // for each thread, initialize the kt lock
+    initlock(&kt->lock, "kthread_lock");
+
     // WARNING: Don't change this line!
     // get the pointer to the kernel stack of the kthread
     kt->kstack = KSTACK((int)((p - proc) * NKT + (kt - p->kthread)));
     kt->state = UNUSED;
     kt->proc = p;
-
-    kt->tid = -1;
-    // for each thread, initialize the kt lock
-    initlock(&kt->lock, "kthread_lock");
   }
-    initlock(&p->tid_lock, "tid_lock");
     p->next_tid = 1;
 
     
@@ -37,10 +36,7 @@ void kthreadinit(struct proc *p)
 
 struct kthread *mykthread()
 {
-  //return &myproc()->kthread[0];
-
-  // struct cpu *c = &cpus[cpuid()];
-  // return c->thread;
+  
     push_off();
     struct cpu *c = mycpu();
     struct kthread *kt = c->thread;
@@ -60,34 +56,25 @@ int alloctid(struct proc *p)
 }
 
 struct kthread* allockthread(struct proc *p){
-  // printf("allockthread\n");
+
   struct kthread *kt;
   for (kt = p->kthread; kt < &p->kthread[NKT]; kt++)
   {
     acquire(&kt->lock);
     if (kt->state == UNUSED)
     {
-      // 26.4 changes
-      // kt->proc = p;
-      // kt->killed = 0;
-      // // check if the kthread has a stack, if not, allocate one
-      // if( (kt->kstack = (uint64)kalloc()) == 0) {
-      //   release(&kt->lock);
-      //   return 0;
-      // }
-      //
+      
       kt->state = USED;
       kt->tid = alloctid(p);
       //assign trapframe to the kthread
       kt->trapframe = get_kthread_trapframe(p, kt);
 
-      if(kt->trapframe == 0){
-        printf("entered trapframe == 0\n");
-        freekthread(kt); //must be called holding the KT-LOCK
-        release(&kt->lock);
-        return 0;
-      }
-
+      // if(kt->trapframe == 0){
+      //   printf("entered trapframe == 0\n");
+      //   freekthread(kt); //must be called holding the KT-LOCK
+      //   release(&kt->lock);
+      //   return 0;
+      // }
 
       //init context to zeros
       memset(&kt->context, 0, sizeof(kt->context));
@@ -107,20 +94,15 @@ struct kthread* allockthread(struct proc *p){
 
 void freekthread(struct kthread *kt)
 {
-  
-  // if(kt->trapframe)
-  //   kfree((void*)kt->trapframe);
-  // kt->trapframe = 0;
-  // //set context to zeros
-  // memset(&kt->context, 0, sizeof(kt->context));
-
-  kt->tid = -1;
+  // kt->kstack = 0;
+  kt->trapframe = 0;
+  kt->tid = 0;
   kt->proc = 0;
-  kt->kstack = 0;
   kt->chan = 0;
   kt->killed = 0;
   kt->exit_status = 0;
   kt->state = UNUSED;
+  memset(&kt->context, 0, sizeof(kt->context));
 }
 
 
@@ -134,6 +116,7 @@ struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 
 
 // TODO: delte this after you are done with task 2.2
+
 // void allocproc_help_function(struct proc *p) {
 //   p->kthread->trapframe = get_kthread_trapframe(p, p->kthread);
 
