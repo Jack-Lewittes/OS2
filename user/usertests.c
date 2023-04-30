@@ -2988,7 +2988,7 @@ int
 countfree()
 {
   int fds[2];
-
+  printf("inside countfree\n");
   if(pipe(fds) < 0){
     printf("pipe() failed in countfree()\n");
     exit(1);
@@ -2997,7 +2997,6 @@ countfree()
   int pid = fork();
 
   if(pid < 0){
-    printf("fork failed in countfree()\n");
     exit(1);
   }
 
@@ -3037,9 +3036,11 @@ countfree()
       break;
     n += 1;
   }
-
+  printf("before close", n);
   close(fds[0]);
+  printf("after close", n);
   wait((int*)0);
+  printf("after wait", n);
   
   return n;
 }

@@ -12,11 +12,8 @@
 //COPIED VERSION
 
 struct cpu cpus[NCPU];
-
 struct proc proc[NPROC];
-
 struct proc *initproc;
-
 int nextpid = 1;
 struct spinlock pid_lock;
 
@@ -129,9 +126,11 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = P_USED;
+  // TASK 2.2
   acquire(&p->tid_lock);
   p->next_tid = 1;
   release(&p->tid_lock);
+  //
 
     // Allocate a trapframe page.
   if((p->base_trapframes = (struct trapframe *)kalloc()) == 0){
@@ -148,7 +147,8 @@ found:
     return 0;
   }
 
-
+  //TASK 2.2
+  // alloc_kthread calls memset, sets ra, sp
   if(!allockthread(p)){
     release(&p->lock);
     return 0;
@@ -168,6 +168,7 @@ freeproc(struct proc *p)
   p->base_trapframes = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  // TASK 2.2 free all thread in proc
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -176,7 +177,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = P_UNUSED;
-    // free all thread in proc
+  // free all thread in proc
   for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
     if (kt->state != UNUSED) {
       acquire(&kt->lock);
@@ -263,8 +264,9 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
-
+   // set up first user thread 
   p->kthread[0].state = RUNNABLE;
+  // release the lock to let scheduler to schedule this thread
   release(&p->kthread[0].lock);
 
   release(&p->lock);
@@ -336,13 +338,12 @@ fork(void)
   acquire(&wait_lock);
   np->parent = p;
   release(&wait_lock);
-
+  //maintain order of process creation, so that the first thread is the one that is scheduled first
   acquire(&np->lock);
   acquire(&np->kthread[0].lock);
   np->kthread[0].state = RUNNABLE;
   release(&np->kthread[0].lock);
   release(&np->lock);
-
   return pid;
 }
 
@@ -376,7 +377,7 @@ exit(int status)
   for(int fd = 0; fd < NOFILE; fd++){
     if(p->ofile[fd]){
       struct file *f = p->ofile[fd];
-      fileclose(f);
+      fileclose(f); 
       p->ofile[fd] = 0;
     }
   }
@@ -397,16 +398,18 @@ exit(int status)
   acquire(&p->lock);
 
   p->xstate = status;
-  p->state = ZOMBIE;
+  p->state = P_ZOMBIE;
 
   release(&p->lock);
 
-  for(struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
-    acquire(&kt->lock);
-    kt->exit_status = status;
-    kt->state = ZOMBIE;
-    if (kt != mykthread()) {
-      release(&kt->lock);
+  //Task 2.2 - exit all threads
+  for(int i = 0; i < NKT; i++){
+    //if unused, then that thread was never initialized, so we don't need to change its state
+    acquire(&p->kthread[i].lock);
+    p->kthread[i].exit_status = status;
+    p->kthread[i].state = ZOMBIE;
+    if (&p->kthread[i] != mykthread()) {
+      release(&p->kthread[i].lock);
     }
   }
 
@@ -587,7 +590,7 @@ sleep(void *chan, struct spinlock *lk)
   acquire(&kt->lock);
   release(lk);
 
-  // Go to sleep.
+  // Go to sleep (parent process)
   kt->chan = chan;
   kt->state = SLEEPING;
 
@@ -595,9 +598,9 @@ sleep(void *chan, struct spinlock *lk)
 
   // Tidy up.
   kt->chan = 0;
-
-  // Reacquire original lock.
+  // maintain order of acquire and release.
   release(&kt->lock);
+  // Reacquire original lock.
   acquire(lk);
 }
 
@@ -611,12 +614,15 @@ wakeup(void *chan)
   for(p = proc; p < &proc[NPROC]; p++) {
     if(p != myproc()){
       acquire(&p->lock);
-      for (struct kthread *kt = p->kthread; kt < &p->kthread[NKT]; kt++){
-        acquire(&kt->lock);
-        if(kt->state == SLEEPING && kt->chan == chan) {
-          kt->state = RUNNABLE;
+      
+      for(int i = 0; i < NKT; i++){
+        acquire(&p->kthread[i].lock);
+        // check chan to wake up all processes sleeping on (parent) chan
+        if(p->kthread[i].state == SLEEPING && p->kthread[i].chan == chan) {
+          p->kthread[i].state = RUNNABLE;
         }
-        release(&kt->lock);
+        release(&p->kthread[i].lock);
+
       }
       release(&p->lock);
     }
