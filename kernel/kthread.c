@@ -63,31 +63,24 @@ struct kthread* allockthread(struct proc *p){
     acquire(&kt->lock);
     if (kt->state == UNUSED)
     {
-      
       kt->state = USED;
       kt->tid = alloctid(p);
       //assign trapframe to the kthread
       kt->trapframe = get_kthread_trapframe(p, kt);
-
-      // if(kt->trapframe == 0){
-      //   printf("entered trapframe == 0\n");
-      //   freekthread(kt); //must be called holding the KT-LOCK
-      //   release(&kt->lock);
-      //   return 0;
-      // }
-
       //init context to zeros
       memset(&kt->context, 0, sizeof(kt->context));
       //change ra register in context to forkret address
       kt->context.ra = (uint64)forkret;
       //change ‘sp’ register in context to the top of the stack
       kt->context.sp = kt->kstack + PGSIZE;
+      //printf("allockthread: end of if UNUSED \n");
       return kt;
     }
     else{
       release(&kt->lock);
     }
   }
+  //printf("allockthread: before return 0 \n");
   return 0;
 
 }

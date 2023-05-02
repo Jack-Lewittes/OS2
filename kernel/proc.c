@@ -297,6 +297,7 @@ growproc(int n)
 int
 fork(void)
 {
+  printf("fork\n");
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
@@ -309,6 +310,9 @@ fork(void)
 
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+    // printf("in uvmcopy with p; %d np; %d myproc; %d\n", p->pid, np->pid, myproc()->pid);
+    release(&np->kthread[0].lock); //new
+    // printf("after release of kthread.pid : %d of proc.id : %d\n",np->kthread[0].tid, np->pid); 
     freeproc(np);
     release(&np->lock);
     return -1;
@@ -333,17 +337,25 @@ fork(void)
   pid = np->pid;
 
   release(&np->kthread[0].lock);
+  // printf("fork: %d -> %d\n", p->pid, np->pid);
   release(&np->lock);
+  // printf("fork: %d -> %d\n", p->pid, np->pid);
 
   acquire(&wait_lock);
+  // printf("acquire wait_lock with pid: %d\n", myproc()->pid);
   np->parent = p;
+
   release(&wait_lock);
   //maintain order of process creation, so that the first thread is the one that is scheduled first
   acquire(&np->lock);
+  // printf("Acquire np->lock with pid: %d\n", myproc()->pid);
   acquire(&np->kthread[0].lock);
+
   np->kthread[0].state = RUNNABLE;
+  // printf("kthread runnable with pid: %d\n", np->kthread[0].tid);
   release(&np->kthread[0].lock);
   release(&np->lock);
+  // printf("release np->lock with pid: %d\n", myproc()->pid);
   return pid;
 }
 
@@ -625,13 +637,14 @@ wakeup(void *chan)
   struct proc *p;
 
   for(p = proc; p < &proc[NPROC]; p++) {
-    for (struct kthread *kernal_thread = p->kthread; kernal_thread < &p->kthread[NKT] ; kernal_thread++) { // go over all the threads in the process 
-      if(kernal_thread!=mykthread()){ //similar to original where it was if(p != myproc())
-      acquire(&kernal_thread->lock);
-      if(kernal_thread->state == SLEEPING && kernal_thread->chan == chan) {
-        kernal_thread->state = RUNNABLE;
-      }
-      release(&kernal_thread->lock);
+    for (struct kthread *kernal_thread = p->kthread; kernal_thread < &p->kthread[NKT] ; kernal_thread++) { 
+      // go over all the threads in the process 
+      if(kernal_thread != mykthread()){ //similar to original where it was if(p != myproc())
+        acquire(&kernal_thread->lock);
+        if(kernal_thread->state == SLEEPING && kernal_thread->chan == chan) {
+          kernal_thread->state = RUNNABLE;
+        }
+        release(&kernal_thread->lock);
     }
     }
   }
@@ -758,8 +771,10 @@ procdump(void)
 
 int kthread_create(void *(*start_func)(), void *stack, uint stack_size) {
   struct proc *curproc = myproc(); // get current process
-  struct kthread *kt = allockthread(curproc); // allocate a kthread
+  struct kthread *kt = allockthread(curproc); 
+  // allocate a kthread (lock released only if no new thread is available)
   if (!kt) {
+    //printf("kthread_create: !kt\n");
     return -1; // no available kthread found
   }
 
@@ -778,7 +793,8 @@ int kthread_create(void *(*start_func)(), void *stack, uint stack_size) {
   kt->trapframe->sp = (uint64)stack + stack_size;
 
   // set thread state to RUNNABLE and release lock
-  acquire(&kt->lock);
+  
+  // acquire(&kt->lock);
   kt->state = RUNNABLE;
   release(&kt->lock);
 
@@ -798,26 +814,26 @@ kthread_id() {
 int
 kthread_kill(int ktid) {
     struct proc *p = myproc();
-    struct kthread *t;
+    struct kthread *kt;
     int found = 0;
 
     acquire(&p->lock);
-    for (t = p->kthread; t < &p->kthread[NKT]; t++) {
-        acquire(&t->lock);
-        if (t->state == UNUSED) {
-            release(&t->lock);
+    for (kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
+        acquire(&kt->lock);
+        if (kt->state == UNUSED) {
+            release(&kt->lock);
             continue;
         }
-        if (t->tid == ktid) {
+        if (kt->tid == ktid) {
             found = 1;
-            t->killed = 1;
-            if (t->state == SLEEPING) {
-                t->state = RUNNABLE;
+            kt->killed = 1;
+            if (kt->state == SLEEPING) {
+                kt->state = RUNNABLE;
             }
-            release(&t->lock);
+            release(&kt->lock);
             break;
         }
-        release(&t->lock);
+        release(&kt->lock);
     }
     release(&p->lock);
 

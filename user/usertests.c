@@ -2632,12 +2632,12 @@ void klttest()
 
   int kt_a = kthread_create((void *(*)())kthread_start_func, stack_a, MAX_STACK_SIZE);
   if(kt_a <= 0){
-    printf("kthread_create failed\n");
+    printf("1-kthread_create failed\n");
     exit(1);
   }
   int kt_b = kthread_create((void *(*)())kthread_start_func, stack_b, MAX_STACK_SIZE);
   if(kt_a <= 0){
-    printf("kthread_create failed\n");
+    printf("2-kthread_create failed\n");
     exit(1);
   }
 
@@ -2661,67 +2661,67 @@ struct test {
   void (*f)(char *);
   char *s;
 } quicktests[] = {
-  // {copyin, "copyin"},
-  // {copyout, "copyout"},
-  // {copyinstr1, "copyinstr1"},
-  // {copyinstr2, "copyinstr2"},
-  // {copyinstr3, "copyinstr3"},
-  // {rwsbrk, "rwsbrk" },
-  // {truncate1, "truncate1"},
-  // {truncate2, "truncate2"},
-  // {truncate3, "truncate3"},
-  // {openiputtest, "openiput"},
-  // {exitiputtest, "exitiput"},
-  // {iputtest, "iput"},
-  // {opentest, "opentest"},
-  // {writetest, "writetest"},
-  // {writebig, "writebig"},
-  // {createtest, "createtest"},
-  // {dirtest, "dirtest"},
-  // {exectest, "exectest"},
-  // {pipe1, "pipe1"},
-  // {killstatus, "killstatus"},
-  // {preempt, "preempt"},
-  // {exitwait, "exitwait"},
-  // {reparent, "reparent" },
-  // {twochildren, "twochildren"},
-  // {forkfork, "forkfork"},
-  // {forkforkfork, "forkforkfork"},
-  // {reparent2, "reparent2"},
-  // {mem, "mem"},
-  // {sharedfd, "sharedfd"},
-  // {fourfiles, "fourfiles"},
-  // {createdelete, "createdelete"},
-  // {unlinkread, "unlinkread"},
-  // {linktest, "linktest"},
-  // {concreate, "concreate"},
-  // {linkunlink, "linkunlink"},
-  // {subdir, "subdir"},
-  // {bigwrite, "bigwrite"},
-  // {bigfile, "bigfile"},
-  // {fourteen, "fourteen"},
-  // {rmdot, "rmdot"},
-  // {dirfile, "dirfile"},
-  // {iref, "iref"},
-  // {forktest, "forktest"},
-  // {sbrkbasic, "sbrkbasic"},
-  // {sbrkmuch, "sbrkmuch"},
-  // {kernmem, "kernmem"},
-  // {MAXVAplus, "MAXVAplus"},
-  // {sbrkfail, "sbrkfail"},
-  // {sbrkarg, "sbrkarg"},
-  // {validatetest, "validatetest"},
-  // {bsstest, "bsstest"},
-  // {bigargtest, "bigargtest"},
-  // {argptest, "argptest"},
-  // {stacktest, "stacktest"},
-  // {textwrite, "textwrite"},
-  // {pgbug, "pgbug" },
-  // {sbrkbugs, "sbrkbugs" },
-  // {sbrklast, "sbrklast"},
-  // {sbrk8000, "sbrk8000"},
-  // {badarg, "badarg" },
-  // {ulttest, "ulttest"},
+  {copyin, "copyin"},
+  {copyout, "copyout"},
+  {copyinstr1, "copyinstr1"},
+  {copyinstr2, "copyinstr2"},
+  {copyinstr3, "copyinstr3"},
+  {rwsbrk, "rwsbrk" },
+  {truncate1, "truncate1"},
+  {truncate2, "truncate2"},
+  {truncate3, "truncate3"},
+  {openiputtest, "openiput"},
+  {exitiputtest, "exitiput"},
+  {iputtest, "iput"},
+  {opentest, "opentest"},
+  {writetest, "writetest"},
+  {writebig, "writebig"},
+  {createtest, "createtest"},
+  {dirtest, "dirtest"},
+  {exectest, "exectest"},
+  {pipe1, "pipe1"},
+  {killstatus, "killstatus"},
+  {preempt, "preempt"},
+  {exitwait, "exitwait"},
+  {reparent, "reparent" },
+  {twochildren, "twochildren"},
+  {forkfork, "forkfork"},
+  {forkforkfork, "forkforkfork"},
+  {reparent2, "reparent2"},
+  {mem, "mem"},
+  {sharedfd, "sharedfd"},
+  {fourfiles, "fourfiles"},
+  {createdelete, "createdelete"},
+  {unlinkread, "unlinkread"},
+  {linktest, "linktest"},
+  {concreate, "concreate"},
+  {linkunlink, "linkunlink"},
+  {subdir, "subdir"},
+  {bigwrite, "bigwrite"},
+  {bigfile, "bigfile"},
+  {fourteen, "fourteen"},
+  {rmdot, "rmdot"},
+  {dirfile, "dirfile"},
+  {iref, "iref"},
+  {forktest, "forktest"},
+  {sbrkbasic, "sbrkbasic"},
+  {sbrkmuch, "sbrkmuch"},
+  {kernmem, "kernmem"},
+  {MAXVAplus, "MAXVAplus"},
+  {sbrkfail, "sbrkfail"},
+  {sbrkarg, "sbrkarg"},
+  {validatetest, "validatetest"},
+  {bsstest, "bsstest"},
+  {bigargtest, "bigargtest"},
+  {argptest, "argptest"},
+  {stacktest, "stacktest"},
+  {textwrite, "textwrite"},
+  {pgbug, "pgbug" },
+  {sbrkbugs, "sbrkbugs" },
+  {sbrklast, "sbrklast"},
+  {sbrk8000, "sbrk8000"},
+  {badarg, "badarg" },
+  {ulttest, "ulttest"},
   {klttest, "klttest"},
 
   { 0, 0},
@@ -3054,6 +3054,7 @@ run(void f(char *), char *s) {
 
 int
 runtests(struct test *tests, char *justone) {
+  printf("runtests\n");
   for (struct test *t = tests; t->s != 0; t++) {
     if((justone == 0) || strcmp(t->s, justone) == 0) {
       if(!run(t->f, t->s)){
@@ -3075,14 +3076,15 @@ runtests(struct test *tests, char *justone) {
 int
 countfree()
 {
+  printf("countfree: ");
   int fds[2];
   if(pipe(fds) < 0){
     printf("pipe() failed in countfree()\n");
     exit(1);
   }
-  
+  printf("before fork\n");
   int pid = fork();
-
+  printf("after fork pid: %d\n", pid);
   if(pid < 0){
     exit(1);
   }
@@ -3136,6 +3138,7 @@ drivetests(int quick, int continuous, char *justone) {
     int free0 = countfree();
     int free1 = 0;
     if (runtests(quicktests, justone)) {
+      printf("SOME QUICK TESTS FAILED\n");
       if(continuous != 2) {
         return 1;
       }
