@@ -8,7 +8,6 @@ static int num_threads = 0;
 static int first_flag = 0;                          // 0 -> havent started, 1=> start_all has been called (can't call it again)
 
 void uthread_init() {
-    // printf("uthread_init\n");
     for (int i = 0; i < MAX_UTHREADS; i++) {
         uthreads_table[i].state = FREE;
     }
@@ -48,21 +47,18 @@ int uthread_create(void (*start_func)(), enum sched_priority priority) {
 
     // Update the number of threads
     num_threads++;
-
-
     return 0;
 }
 
-// Function called to pick next thread based on priority
-void uthread_yield() {
-    // printf("uthread_yield\n");
+void schedUThread(){
     int i, next_thread = -1;
     enum sched_priority highest_priority = LOW;
 
     // Find the next runnable thread with highest priority
     for (i = 0; i < MAX_UTHREADS; i++) {
         // Check if the thread is runnable and has higher priority than the current highest priority (from available threads)
-        if (uthreads_table[i].state == RUNNABLE && uthreads_table[i].priority > highest_priority) {
+        // add next_thread == -1 t: edge case with one killed thread and one low priority thread
+        if (uthreads_table[i].state == RUNNABLE && (next_thread == -1 || uthreads_table[i].priority > highest_priority) ) {
             // Update the highest priority and the next thread
             highest_priority = uthreads_table[i].priority;
             next_thread = i;
@@ -81,26 +77,28 @@ void uthread_yield() {
     }
 }
 
-void uthread_exit() {
-    // printf("uthread_exit\n");
-    // Free the stack of the terminated thread
-    free(current_thread_ptr->ustack);
-    // Mark the thread as free, (fulfilling Round Robin requirement)
-    current_thread_ptr->state = FREE;
-    num_threads--;
+// Function called to pick next thread based on priority
+void uthread_yield() {
+    current_thread_ptr->state = RUNNABLE;
+    schedUThread();
+}
 
-    if (num_threads == 0) {
-        // Last thread, terminate the process
+void uthread_exit() {
+    num_threads--;
+    current_thread_ptr->state = FREE;
+    // set the priority to low so that it doesn't get picked again
+    current_thread_ptr->priority = LOW;
+    if(num_threads == 0){
         exit(0);
-    } else {
-        // Switch to the next runnable thread
-        uthread_yield();
     }
+    else{
+        schedUThread();
+    }
+
 }
 
 // Set the priority of the calling user thread to the specified argument and return the previous priority.
 enum sched_priority uthread_set_priority(enum sched_priority priority) {
-    // printf("uthread_set_priority\n");
     // Check if the priority is valid
     if (priority < LOW || priority > HIGH) {
         return uthreads_table[current_thread_ptr->index].priority;  // Return current priority
@@ -115,7 +113,6 @@ enum sched_priority uthread_set_priority(enum sched_priority priority) {
 
 // Return the current priority of the calling user thread.
 enum sched_priority uthread_get_priority() {
-    printf("uthread_get_priority\n");
     return uthread_self()->priority;
 }
 
@@ -123,15 +120,7 @@ enum sched_priority uthread_get_priority() {
     Edge Case: Calling uthread_start_all() when no threads have been created
 */
 int uthread_start_all() {
-    //static int started = 0;
-    // if(num_threads == 0) {
-    //     exit(0);
-    // }
-    // // Set the current thread pointer to 0 as since no thread has been started yet
-    // current_thread_ptr = 0;
-    // uthread_yield();
-    // exit(0);
-    // printf("uthread_start_all\n");
+    
     if(first_flag == 1){
         return -1;
     }
