@@ -59,7 +59,7 @@ sys_sleep(void)
   acquire(&tickslock);
   ticks0 = ticks;
   while(ticks - ticks0 < n){
-    if(killed(myproc())){
+    if(killed(myproc()) || kthread_killed(mykthread())){
       release(&tickslock);
       return -1;
     }
@@ -90,3 +90,52 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+//Task 2.3
+uint64
+sys_kthread_create(void)
+{
+  void* start_func;
+  void* stack;
+  uint stack_size;
+
+  argaddr(0, (void*)&start_func);
+  argaddr(1, (void*)&stack);
+  argint(2, (int*)&stack_size);
+
+  return kthread_create(start_func, stack, stack_size);
+}
+
+uint64
+sys_kthread_id(void)
+{
+  return kthread_id();
+}
+
+uint64
+sys_kthread_kill(void)
+{
+  int pid;
+  argint(0, &pid);
+  return kthread_kill(pid);
+}
+
+uint64
+sys_kthread_exit(void)
+{
+  int n;
+  argint(0, &n);
+  kthread_exit(n);
+  return 0;  // not reached
+}
+
+uint64 sys_kthread_join(void)
+{
+  int ktid;
+  argint(0, &ktid);
+  uint64 status; 
+  argaddr(1, &status);
+  kthread_join(ktid, (int*)status);
+  return 0;
+}
+

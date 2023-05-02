@@ -116,7 +116,7 @@ enum sched_priority uthread_set_priority(enum sched_priority priority) {
 // Return the current priority of the calling user thread.
 enum sched_priority uthread_get_priority() {
     printf("uthread_get_priority\n");
-    return current_thread_ptr->priority;
+    return uthread_self()->priority;
 }
 
 /*

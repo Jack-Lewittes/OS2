@@ -413,6 +413,18 @@ exit(int status)
     }
   }
 
+  //Taske 2.3
+  struct kthread *kt = mykthread();
+
+  for(int i = 0; i < NKT; i++){
+      if(p->kthread[i].tid != kt->tid && p->kthread[i].state !=UNUSED){
+        acquire(&(p->kthread[i].lock));
+        p->kthread[i].killed = 1;
+        release(&(p->kthread[i].lock));
+        kthread_join(p->kthread[i].tid,0);
+      }
+    }
+
   release(&wait_lock);
 
   // Jump into the scheduler, never to return.
@@ -459,7 +471,7 @@ wait(uint64 addr)
     }
 
     // No point waiting if we don't have any children.
-    if(!havekids || killed(p)){
+    if(!havekids || killed(p) || kthread_killed(mykthread())){
       release(&wait_lock);
       return -1;
     }
@@ -604,6 +616,7 @@ sleep(void *chan, struct spinlock *lk)
   acquire(lk);
 }
 
+
 // Wake up all processes sleeping on chan.
 // Must be called without any p->lock.
 void
@@ -612,22 +625,19 @@ wakeup(void *chan)
   struct proc *p;
 
   for(p = proc; p < &proc[NPROC]; p++) {
-    if(p != myproc()){
-      acquire(&p->lock);
-      
-      for(int i = 0; i < NKT; i++){
-        acquire(&p->kthread[i].lock);
-        // check chan to wake up all processes sleeping on (parent) chan
-        if(p->kthread[i].state == SLEEPING && p->kthread[i].chan == chan) {
-          p->kthread[i].state = RUNNABLE;
-        }
-        release(&p->kthread[i].lock);
-
+    for (struct kthread *kernal_thread = p->kthread; kernal_thread < &p->kthread[NKT] ; kernal_thread++) { // go over all the threads in the process 
+      if(kernal_thread!=mykthread()){ //similar to original where it was if(p != myproc())
+      acquire(&kernal_thread->lock);
+      if(kernal_thread->state == SLEEPING && kernal_thread->chan == chan) {
+        kernal_thread->state = RUNNABLE;
       }
-      release(&p->lock);
+      release(&kernal_thread->lock);
+    }
     }
   }
 }
+
+
 
 // Kill the process with the given pid.
 // The victim won't exit until it tries to return
@@ -673,6 +683,17 @@ killed(struct proc *p)
   acquire(&p->lock);
   k = p->killed;
   release(&p->lock);
+  return k;
+}
+
+//TASK 2.3
+int
+kthread_killed(struct kthread *kt)
+{
+  int k; 
+  acquire(&kt->lock);
+  k = kt->killed;
+  release(&kt->lock);
   return k;
 }
 
@@ -730,5 +751,144 @@ procdump(void)
       state = "???";
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
+  }
+}
+
+//Task 2.3
+
+int kthread_create(void *(*start_func)(), void *stack, uint stack_size) {
+  struct proc *curproc = myproc(); // get current process
+  struct kthread *kt = allockthread(curproc); // allocate a kthread
+  if (!kt) {
+    return -1; // no available kthread found
+  }
+
+  // initialize kthread fields
+  kt->killed = 0;
+  kt->exit_status = 0;
+  kt->chan = 0;
+
+  // allocate kernel stack for the kthread
+  kt->kstack = (uint64)stack + stack_size;
+  
+  // set user-space 'epc' register to point to start_func
+  kt->trapframe->epc = (uint64)start_func;
+
+  // set user-space 'sp' register to the top of the stack
+  kt->trapframe->sp = (uint64)stack + stack_size;
+
+  // set thread state to RUNNABLE and release lock
+  acquire(&kt->lock);
+  kt->state = RUNNABLE;
+  release(&kt->lock);
+
+  return kt->tid; // return thread ID
+}
+
+
+int
+kthread_id() {
+  struct kthread *kt = mykthread();
+  if (!kt) {
+    return -1;
+  }
+  return kt->tid;  // return the thread's tid
+}
+
+int
+kthread_kill(int ktid) {
+    struct proc *p = myproc();
+    struct kthread *t;
+    int found = 0;
+
+    acquire(&p->lock);
+    for (t = p->kthread; t < &p->kthread[NKT]; t++) {
+        acquire(&t->lock);
+        if (t->state == UNUSED) {
+            release(&t->lock);
+            continue;
+        }
+        if (t->tid == ktid) {
+            found = 1;
+            t->killed = 1;
+            if (t->state == SLEEPING) {
+                t->state = RUNNABLE;
+            }
+            release(&t->lock);
+            break;
+        }
+        release(&t->lock);
+    }
+    release(&p->lock);
+
+    if (!found) {
+        return -1;
+    }
+    return 0;
+}
+
+
+void
+kthread_exit(int status)
+{
+  struct kthread *t = mykthread();
+  struct proc *p = t->proc;
+
+  acquire(&t->lock);
+
+  t->exit_status = status;
+  t->state = ZOMBIE;
+
+  release(&t->lock);
+
+  acquire(&p->lock);
+  // Check if all threads in the process have exited
+  int all_threads_exited = 1;
+  for (int i = 0; i < NKT; i++) {
+    if (p->kthread[i].state != UNUSED && p->kthread[i].state != ZOMBIE) {
+      all_threads_exited = 0;
+      break;
+    }
+  }
+  if (all_threads_exited) {
+    p->xstate = status;
+    p->state = P_ZOMBIE;
+    // Notify parent if it's waiting for the process
+    wakeup(p->parent);
+  }
+  release(&p->lock);
+
+  // Jump into the scheduler, never to return.
+  sched();
+  panic("kthread_exit: scheduler returned");
+}
+
+int
+kthread_join(int ktid, int *status){
+  struct proc *p = myproc();
+  struct kthread *kt;
+
+  for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
+    if(kt->tid == ktid){
+      break;
+    }
+  }
+  acquire(&p->lock);
+  for(;;){
+    acquire(&kt->lock);
+    if(kt->state == ZOMBIE){
+      if(status != 0 && copyout(p->pagetable,(uint64)status, (char *)&kt->exit_status, sizeof(kt->exit_status)) < 0){
+        release(&kt->lock);
+        release(&p->lock);
+        return -1;
+      }
+      freekthread(kt);
+      release(&kt->lock);
+      release(&p->lock);
+      return 0;
+    }
+    release(&kt->lock);
+
+    sleep(&kt->lock, &p->lock);
   }
 }

@@ -54,8 +54,18 @@ usertrap(void)
   if(r_scause() == 8){
     // system call
 
-    if(killed(p))
+    acquire(&p->lock);
+    acquire(&kt->lock);
+    int proc_killed_status = p->killed;
+    int kt_killed_status = kt->killed;
+    release(&kt->lock);
+    release(&p->lock);
+    if (proc_killed_status) {
       exit(-1);
+    }
+    else if (kt_killed_status) {
+      kthread_exit(-1);
+    }
 
     // sepc points to the ecall instruction,
     // but we want to return to the next instruction.
@@ -74,8 +84,18 @@ usertrap(void)
     setkilled(p);
   }
 
-  if(killed(p))
+  acquire(&p->lock);
+  acquire(&kt->lock);
+  int proc_killed_status = p->killed;
+  int kt_killed_status = kt->killed;
+  release(&kt->lock);
+  release(&p->lock);
+  if (proc_killed_status) {
     exit(-1);
+  }
+  else if (kt_killed_status) {
+    kthread_exit(-1);
+  }
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
