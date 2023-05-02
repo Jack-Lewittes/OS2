@@ -855,7 +855,7 @@ kthread_exit(int status)
   t->exit_status = status;
   t->state = ZOMBIE;
 
-  release(&t->lock);
+  //release(&t->lock);
 
   acquire(&p->lock);
   // Check if all threads in the process have exited
