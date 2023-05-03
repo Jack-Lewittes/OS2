@@ -51,11 +51,12 @@ int alloctid(struct proc *p)
   acquire(&p->tid_lock);
   int tid = p->next_tid++;
   release(&p->tid_lock);
-
+  printf("alloctid: tid± %d\n", tid);
   return tid;
 }
 
 struct kthread* allockthread(struct proc *p){
+  printf("allockthread\n");
 
   struct kthread *kt;
   for (kt = p->kthread; kt < &p->kthread[NKT]; kt++)
@@ -73,14 +74,13 @@ struct kthread* allockthread(struct proc *p){
       kt->context.ra = (uint64)forkret;
       //change ‘sp’ register in context to the top of the stack
       kt->context.sp = kt->kstack + PGSIZE;
-      //printf("allockthread: end of if UNUSED \n");
       return kt;
     }
     else{
       release(&kt->lock);
     }
   }
-  //printf("allockthread: before return 0 \n");
+  printf("allockthread: kt.tid: %d\n", kt->tid);
   return 0;
 
 }

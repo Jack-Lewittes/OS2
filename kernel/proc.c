@@ -297,7 +297,6 @@ growproc(int n)
 int
 fork(void)
 {
-  printf("fork\n");
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
@@ -337,25 +336,19 @@ fork(void)
   pid = np->pid;
 
   release(&np->kthread[0].lock);
-  // printf("fork: %d -> %d\n", p->pid, np->pid);
   release(&np->lock);
-  // printf("fork: %d -> %d\n", p->pid, np->pid);
 
   acquire(&wait_lock);
-  // printf("acquire wait_lock with pid: %d\n", myproc()->pid);
   np->parent = p;
 
   release(&wait_lock);
   //maintain order of process creation, so that the first thread is the one that is scheduled first
   acquire(&np->lock);
-  // printf("Acquire np->lock with pid: %d\n", myproc()->pid);
   acquire(&np->kthread[0].lock);
 
   np->kthread[0].state = RUNNABLE;
-  // printf("kthread runnable with pid: %d\n", np->kthread[0].tid);
   release(&np->kthread[0].lock);
   release(&np->lock);
-  // printf("release np->lock with pid: %d\n", myproc()->pid);
   return pid;
 }
 
@@ -440,6 +433,7 @@ exit(int status)
   release(&wait_lock);
 
   // Jump into the scheduler, never to return.
+  printf("call sched from end of exit, myproc.pid = %d\n", myproc()->pid);
   sched();
   panic("zombie exit");
 }
@@ -855,11 +849,11 @@ kthread_exit(int status)
   t->exit_status = status;
   t->state = ZOMBIE;
 
-  //release(&t->lock);
+  release(&t->lock);
 
   acquire(&p->lock);
   // Check if all threads in the process have exited
-  int all_threads_exited = 1;
+  int all_threads_exited = 1; 
   for (int i = 0; i < NKT; i++) {
     if (p->kthread[i].state != UNUSED && p->kthread[i].state != ZOMBIE) {
       all_threads_exited = 0;
